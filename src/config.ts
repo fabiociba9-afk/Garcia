@@ -151,13 +151,11 @@ export const FAST_MODE = true
  * Wake-word engine.
  *   'speech'    — zero setup, uses the browser's SpeechRecognition to listen for
  *                 "hey GARCIA". Chrome/Edge only, audio goes to Google.
- *   'porcupine' — recommended. Runs offline in WASM, "GARCIA" is a built-in
- *                 keyword, far fewer false triggers. Needs a free AccessKey
- *                 from console.picovoice.ai.
+ *   'porcupine' — not enabled for Garcia yet: its built-in keyword is not
+ *                 Garcia. A custom wake-word model must be supplied first.
+ * Until that model exists, use browser SpeechRecognition for the Garcia phrase.
  */
-export const WAKE_ENGINE: 'speech' | 'porcupine' = env.porcupineKey
-  ? 'porcupine'
-  : 'speech'
+export const WAKE_ENGINE: 'speech' | 'porcupine' = 'speech'
 
 // ---------------------------------------------------------------------------
 // MCP servers
