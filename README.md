@@ -379,3 +379,12 @@ MIT.
 The boot sound and any tracks in `public/audio/` ship with the project for the
 demo. If you go on to monetise something built on this, clearing the rights to
 that audio is your responsibility.
+
+
+## Estado da adaptação Garcia
+
+- The project identity, internal environment variables, MCP tool names, transcript roles, UI labels, and local workspace path have been renamed to Garcia.
+- The wake phrase matcher recognizes “Garcia”. Offline wake-word detection is not ready: Porcupine does not provide Garcia as a built-in keyword, so its path remains disabled until a custom model is supplied.
+- The current transcription fallback is browser SpeechRecognition, and the optional enhanced path uses ElevenLabs. Local Whisper has not yet been integrated.
+- The server brain still uses the Claude Agent SDK and a Claude Code login; this version is not yet fully local or zero-subscription.
+- Android-to-server communication is a separate integration step and is not claimed as complete.
