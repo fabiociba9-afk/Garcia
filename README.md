@@ -1,125 +1,379 @@
-# Ciba AI
+# J.A.R.V.I.S.
 
-Repositório e infraestrutura de servidor para a assistente de IA Garcia e futuras integrações.
+A browser voice assistant with an Iron Man holographic interface. Say
+**"Hey Jarvis"**, he wakes, listens, and does real things through your tools —
+searches the web, generates images, drives your phone, reads your mail. The face
+is a web page (React + Vite + Three.js + custom GLSL). The brain is Claude Code,
+run headless as a library.
 
-## Objetivos
+**The only subscription you need is Claude Code.** No API keys, no OpenAI
+account, no cloud bill — the brain runs on your existing Claude Code login, and
+the heavy work (the model itself) runs on Anthropic's servers, so even a low-end
+laptop only has to draw the interface. **ElevenLabs is an optional add-on** that
+gives JARVIS a much better voice and sharper hearing; without it he speaks and
+listens through the browser's own speech, and everything still works.
 
-- Backend independente que fornece inferência e APIs à assistente Garcia; integrações com outros aplicativos serão adicionadas futuramente.
-- Acesso privado de proprietário único: a Garcia só pode ter um proprietário ativo e um dispositivo registrado por vez; não há cadastro público ou fluxo multiusuário.
-- Acesso controlado por convites de uso único e token de dispositivo protegido.
-- Núcleo Ciba Core com roteamento por especialidade e identidade unificada.
-- Provider atual Cloudflare Workers AI e adapter preparado para endpoints OpenAI-compatible auto-hospedados.
-- Perfis especialistas selecionados sem chamadas adicionais no modo econômico single-pass.
-- Memória curada e privada do proprietário, separada do histórico; conversas não são persistidas pelo gateway.
-- Primitiva opt-in de ensemble para até três especialistas independentes e uma síntese, ainda desativada sem providers configurados.
-- Registro de providers e ferramentas opt-in com allowlist, validação de entrada/saída e autorização pela aplicação.
-- Sem fallback pago, cobrança automática ou uso de credenciais Google do mantenedor.
-- Limites diários por dispositivo, aplicativo e instalação.
-- Não persistir o conteúdo das conversas.
+---
 
-## Custo zero: condição obrigatória
+## Requirements
 
-A franquia gratuita documentada pela Cloudflare é de 10.000 Neurons por dia. No Workers Free, as chamadas falham ao atingir o limite; no Workers Paid, o excedente é cobrado a US$ 0,011 por 1.000 Neurons. O modelo Gemma 4 está listado a 9.091 Neurons por milhão de tokens de entrada e 27.273 por milhão de tokens de saída. Os tetos internos foram reduzidos para criar margem dentro da franquia, mas não representam garantia matemática de consumo: a contagem real deve ser acompanhada no painel. [Tabela oficial por modelo](https://developers.cloudflare.com/workers-ai/platform/pricing/). Para manter custo zero, use uma conta Workers Free, não habilite Workers Paid nem créditos pré-pagos do AI Gateway e não configure fallback pago. O limite interno de requisições do Ciba AI é uma proteção adicional, não uma conversão exata de Neurons. Confira o painel de consumo da Cloudflare regularmente. [Documentação oficial de preços](https://developers.cloudflare.com/workers-ai/platform/pricing/).
+**In one line:** a Claude Code subscription, plus two free things every computer
+can have — Node.js and Chrome. That's the whole list.
 
-## Estado do projeto
+- **Claude Code, installed and logged in** — this is the only account you need.
+  Install it with the official method — `npm install -g @anthropic-ai/claude-code`,
+  or the platform installer at <https://docs.claude.com/en/docs/claude-code> —
+  then run `claude` once and complete login. The bridge reuses that login. **No
+  API key**, and usage is billed to your existing Claude account.
+- **Node.js 20 or newer** — free, one installer from <https://nodejs.org>. This
+  is a Node web app, so it is the one unavoidable tool.
+- **Google Chrome or Microsoft Edge**, in a **real browser window** — not an
+  embedded preview pane. Preview panes (including the one inside editors and
+  Claude Code) block microphone access, so the page loads and looks right but
+  never hears you. JARVIS also needs WebGL, which these browsers provide.
+- **Optional: an ElevenLabs API key** — a good add-on, not a requirement. It
+  gives a better voice and sharper transcription; the free tier is plenty for a
+  demo. Without it, everything runs on the browser's own speech.
 
-A assistente se chama **Garcia**. **Ciba AI** é somente o nome deste repositório e da infraestrutura de servidor Cloudflare que fornece a API. A Garcia é o produto de IA com identidade e aplicativo próprios. O Worker Ciba AI está publicado em `https://ciba-ai.fabiociba7.workers.dev`, com D1 conectado, migrations aplicadas, autenticação por dispositivo e limites de uso. O endpoint `/v1/status` confirmou o serviço pronto e a IA habilitada; uma inferência real ainda deverá ser validada na rodada final com o aplicativo. O projeto Android independente da Garcia está em [garcia-android/](garcia-android/), com interface nativa, conversa, histórico local criptografado e conexão com a API. A rota de pareamento do cliente corresponde a `POST /v1/owner/pair`. Após publicar a configuração que permite `com.ciba.garcia`, execute uma única vez o workflow `Provision Garcia Device`, confirmando a operação, para criar o proprietário privado e emitir os códigos únicos de ativação. O workflow `Ciba AI Deploy` publica automaticamente mudanças de backend na branch `main`, aplica migrations e verifica a saúde do Worker. Mudanças exclusivas no app Android ou na documentação não disparam deploy do servidor. O registro de ferramentas externas está conectado ao orquestrador com validação, autorização e aprovação durável; integrações externas continuam opt-in.
+Run `npm run setup` after cloning and it checks all of this for you, in plain
+language.
 
-## Infraestrutura e expansão
+---
 
-Consulte [INFRASTRUCTURE_AUDIT.md](docs/INFRASTRUCTURE_AUDIT.md) para a auditoria dos limites gratuitos, estado confirmado em produção e critérios de expansão sem custos.
+## Quick start
 
-## Arquitetura
-
-A camada de inteligência unificada está descrita em [UNIFIED_INTELLIGENCE.md](docs/UNIFIED_INTELLIGENCE.md), e a seleção de projetos open source em [OPEN_SOURCE_SELECTION.md](docs/OPEN_SOURCE_SELECTION.md). O núcleo atual usa um único modelo por chamada e seleciona um perfil especialista; não afirma executar vários modelos independentes. O adapter para providers OpenAI-compatible está preparado, mas ainda não conectado nem configurado.
-
-
-```
-App Ciba
-  |-- POST /v1/auth/register  (convite de uso único)
-  |-- POST /v1/ai/chat        (Bearer token do dispositivo)
-  |-- GET  /v1/usage
-  v
-Ciba AI Worker
-  |-- autenticação e autorização
-  |-- cotas atômicas em D1
-  |-- Cloudflare Workers AI
-  v
-Resposta ao app (sem armazenar o histórico)
-```
-
-## Identidade exclusiva da Garcia
-
-A Garcia é uma assistente privada de Ciba, não um serviço multiusuário. O backend permite apenas um dispositivo ativo para `com.ciba.garcia`, impede a emissão de convites adicionais enquanto esse dispositivo estiver ativo e não permite criar outro proprietário para a mesma instalação. Para substituir o aparelho, o dispositivo anterior deve ser revogado pelo administrador antes de um novo provisionamento. A memória curada inicial identifica Ciba como criador, proprietário, mentor, amigo e parceiro da Garcia; nenhum histórico de conversa é importado automaticamente.
-
-## Aplicativo Android Garcia
-
-O aplicativo Android é um projeto independente dentro de `garcia-android/`; não depende do GEIVIA ou do Zupi. Consulte o [README da Garcia](garcia-android/README.md) para arquitetura, abertura no Android Studio e ativação privada de dispositivo único.
-
-## Desenvolvimento
-
-Requisitos: Node.js 20+ e conta Cloudflare.
+First, install, then start it:
 
 ```bash
 npm install
-npm run check
-npx wrangler d1 create ciba-ai-db
+npm start          # runs the brain and the face together
 ```
 
-Copie o ID retornado para `wrangler.toml`. Confirme os package IDs Android permitidos em `ALLOWED_APP_IDS` (a Garcia usa `com.ciba.garcia`), aplique as migrations e configure os segredos:
+Then open the URL it prints (http://localhost:5173) in **Chrome**, click **INITIALISE**, and say **“Hey Jarvis”**.
+
+Prefer two terminals? Run them separately instead:
 
 ```bash
-npx wrangler d1 migrations apply ciba-ai-db --remote
-npx wrangler secret put ADMIN_TOKEN
-npx wrangler deploy
+npm install
 ```
 
-O nome do modelo é configurado em `AI_MODEL`. Antes de produção, confirme no catálogo da Cloudflare o identificador e a disponibilidade do modelo escolhido para a sua conta.
+Terminal 1 — the brain:
 
-## Variáveis
+```bash
+npm run bridge
+```
 
-| Variável | Uso |
+Terminal 2 — the face:
+
+```bash
+npm run dev
+```
+
+Then open the app in a **real Chrome or Edge window**:
+
+```bash
+open http://localhost:5173
+```
+
+Click **INITIALISE**, allow the microphone when asked, and say **"Hey Jarvis"**.
+
+> It has to be a real browser window. Embedded preview panes block the
+> microphone, so JARVIS will look perfectly alive and simply never respond.
+
+---
+
+## How it works
+
+JARVIS is two processes. The browser is the face and the voice; the bridge is
+the brain and the hands.
+
+```
+  ┌─ browser (the face) ───────────────┐        ┌─ bridge (the brain) ─────────────┐
+  │  "Hey Jarvis" wake word            │        │  Node · bridge/server.mjs        │
+  │  local VAD  →  speech to text      │   ws   │  Claude Agent SDK                │
+  │  reactor UI (Three.js + GLSL)      │◄─────► │   = Claude Code, headless        │
+  │  text to speech                    │  8787  │  spawns your MCP servers         │
+  │  heads-up display                  │        │  permission gate (decideTool)    │
+  └────────────────────────────────────┘        └──────────────────────────────────┘
+```
+
+Everything you see and hear happens in the browser. The bridge is a single Node
+process (`bridge/server.mjs`) that runs the **Claude Agent SDK**
+(`@anthropic-ai/claude-agent-sdk`) — this spawns the real `claude` CLI as a child
+process, so **the brain literally is Claude Code, headless.** They talk over a
+WebSocket (plus a few HTTP endpoints) on `ws://localhost:8787`.
+
+**Why a bridge at all?** A browser tab cannot spawn the local stdio MCP servers —
+`higgsfield`, `elevenlabs`, `android`, `playwright`, `exa`, `serper`, and the
+rest. The bridge can. And because it is the Agent SDK, it authenticates off your
+existing Claude Code login: no API key, billed to that same Claude account.
+
+**The model.** `claude-opus-5` at effort `medium` by default. Override with the
+`JARVIS_MODEL` and `JARVIS_EFFORT` environment variables. On startup the bridge
+prints its choice, e.g. `[jarvis] model claude-opus-5 · effort medium`.
+
+### The voice pipeline
+
+The loop is designed so that nothing silently dies and barge-in feels natural.
+
+- **Detection is local.** An energy-based voice-activity detector
+  (`src/lib/vad.ts`) decides when you are speaking. It is instant, cannot quietly
+  fail, and is what makes **barge-in** work — speak while JARVIS is talking and he
+  stops.
+- **Transcription has two tiers, chosen automatically at boot.** The browser asks
+  the bridge `/health` and picks the best available:
+  - **ElevenLabs key present** → ElevenLabs Scribe, via the bridge `/stt` endpoint.
+  - **Nothing configured** → the browser's own `SpeechRecognition` (Chrome/Edge),
+    guarded by a heartbeat so it recovers when Chrome throttles it.
+- **Speaking** uses the **ElevenLabs voice when a key is present**, and the
+  browser's `speechSynthesis` otherwise. If a cloud call fails it falls back to
+  the browser voice, and if the OS voice itself is broken it latches over to the
+  cloud voice.
+
+So it works with no keys and auto-upgrades when a key appears — there is no flag
+to set. Capability detection lives in `src/lib/capabilities.ts`, which probes the
+bridge's `GET /health` (returning `{ ok, tts, stt }`, both tracking the
+ElevenLabs key) once at boot and picks the engines.
+
+---
+
+## What JARVIS can do
+
+Beyond answering, JARVIS reaches every MCP server in your Claude Code
+configuration, and can drive his own interface.
+
+### Your tools
+
+Every server in your `~/.claude.json` is handed to the SDK explicitly, or only the
+ones you name in `JARVIS_MCP_SERVERS`. Depending on what you have installed, that
+is roughly:
+
+- **Web & search** — `exa`, `serper`, `serpapi`
+- **Images & video** — `higgsfield`, `openrouter-image`, `palmier-pro`
+- **Voice** — `elevenlabs`
+- **Your phone** — `android`
+- **The browser** — `playwright`
+
+A few things you can say:
+
+- *"What's happening in AI this week?"*
+- *"Generate an image of the Mark VII suit."*
+- *"Take a screenshot of my phone."*
+- *"Open my GitHub notifications."*
+
+> **Note on account connectors.** Servers you added through your **claude.ai
+> account** (mail, drive, calendar and other account connectors) are not in `~/.claude.json`,
+> but the CLI fetches them on its own and they join the session from the second
+> turn. The bridge keeps them out by default; set `JARVIS_ACCOUNT_CONNECTORS=1`
+> to let them in, and `JARVIS_MCP_SERVERS` to choose which `~/.claude.json`
+> servers JARVIS gets.
+
+### JARVIS controls the interface
+
+He drives the UI through MCP tools the bridge exposes:
+
+- `ui_theme` — accent, background, per-phase colours
+- `ui_reactor` — colour, scale, intensity, spin, and style (`ring` | `sphere` | `wire`), visibility
+- `ui_orbit` — put images in orbit around the reactor
+- `ui_chrome` — show or hide rails, transcript, badges
+- `ui_effect` — `glitch` | `pulse` | `scan` | `shake` | `flash`
+- `ui_screen` — clear
+- `ui_reset` — back to defaults
+
+So *"make it red, hide the systems list, put that render in orbit"* is a spoken
+command.
+
+### The heads-up display
+
+JARVIS authors panels with a `display` tool against a fixed `.hud-*` design
+system. The browser sanitises the markup (DOMPurify, a class allowlist and a
+strict CSP) before rendering. Rich media works — images, `<video>`, and
+YouTube/Vimeo embeds. Remote images and video are fetched **server-side** through
+the bridge (`/img` and `/media`, both SSRF-guarded), so hotlink-blocked news
+thumbnails still appear and the page never beacons your IP to a host the model
+chose.
+
+---
+
+## Controls
+
+| Key / phrase | Does |
 |---|---|
-| `AI_MODEL` | Identificador do modelo Workers AI |
-| `ALLOWED_APP_IDS` | IDs de apps Ciba separados por vírgula |
-| `DAILY_GLOBAL_LIMIT` | Requisições globais/dia (teto 50) |
-| `DAILY_APP_LIMIT` | Requisições por app/dia (teto 25) |
-| `DAILY_DEVICE_LIMIT` | Requisições por dispositivo/dia (teto 10) |
-| `MAX_OUTPUT_TOKENS` | Limite de saída solicitado ao modelo (teto 512) |
-| `ADMIN_TOKEN` | Segredo para operações administrativas |
+| **"Hey Jarvis"** | Wake him |
+| **Space** | Talk without the wake word |
+| Just speak | Interrupt him mid-sentence (barge-in) |
+| **V** | Cycle the browser voice |
+| **Escape** | Stand down |
+| **D** | Live diagnostics panel |
+| **T** | One-line audio self-test |
 
-## Rotas
+---
 
-- `GET /v1/status`
-- `GET /v1/config` (configuração pública para os aplicativos)
-- `GET /v1/models`
-- `GET /v1/ai/capabilities`
-- `POST /v1/auth/register`
-- `POST /v1/ai/chat`
-- `GET /v1/usage`
-- `GET /v1/admin/apps`
-- `POST /v1/admin/apps`
-- `POST /v1/admin/invitations`
-- `POST /v1/admin/devices/revoke`
-- `GET /v1/admin/ai/overview` (visão protegida para futura tela administrativa)
-- `GET /v1/admin/settings`
-- `POST /v1/admin/settings`
+## The boot sequence
 
-A integração MCP HTTP da Garcia está descrita em [MCP.md](docs/MCP.md). A biblioteca de skills está documentada em [SKILLS.md](docs/SKILLS.md). A integração Composio está descrita em [COMPOSIO.md](docs/COMPOSIO.md). Consulte [TOOLS.md](docs/TOOLS.md) para ativar ferramentas com autorização explícita e conhecer os limites do registro. Consulte [PROVISIONING.md](docs/PROVISIONING.md) e o workflow `Provision Garcia Device` para o provisionamento privado do dispositivo. Consulte [TESTING.md](docs/TESTING.md) para executar os testes locais sem credenciais Cloudflare. Consulte [APP_INTEGRATION.md](docs/APP_INTEGRATION.md) para o contrato de integração dos clientes. Consulte [SECURITY.md](docs/SECURITY.md) antes de disponibilizar convites ou distribuir os aplicativos. A futura tela Configurações deve usar a API descrita em [SETTINGS.md](docs/SETTINGS.md); segredos de infraestrutura nunca devem ser enviados ao cliente.
+Power-up plays a four-beat Iron Man start-up (`src/ui/Boot.tsx`): an
+"INITIATING SYSTEM" status bar with a segmented progress bar and boot log; then
+concentric reticle rings resolving into "J.A.R.V.I.S"; then a suit schematic;
+then the triangular arc reactor lighting up — with a start-up sound under it
+(`public/audio/boot-music.mp3`).
 
+---
 
-## Proteções de uso
+## Configuration
 
-- O endpoint `POST /v1/ai/chat` limita cada dispositivo a 12 chamadas por minuto; excedentes recebem HTTP 429 (`rate_limit_exceeded`).
-- Tetos rígidos: 50 requisições globais/dia, 25 por app/dia, 10 por dispositivo/dia, 512 tokens de saída, 1.500 caracteres por mensagem e 3.000 caracteres por requisição. A tela administrativa poderá reduzir, mas não elevar esses tetos.
-- O modelo efetivo é validado por allowlist no próprio Worker. Atualmente, somente `@cf/google/gemma-4-26b-a4b-it` é aceito; uma configuração de ambiente fora da allowlist não será executada.
-- As migrations `0004_minute_rate_limit.sql` e `0005_configurable_rate_limit.sql` criam o contador por minuto. A limpeza agendada remove registros antigos.
+Everything is optional in bridge mode. Frontend settings live in `.env.local`
+(copy `.env.example`); bridge settings are environment variables.
 
+### Bridge
 
-## Pesquisa e Estúdio Visual da Garcia
+| Variable | Default | Effect |
+|---|---|---|
+| `JARVIS_BRIDGE_PORT` | `8787` | Port for the WebSocket + HTTP endpoints |
+| `JARVIS_BRIDGE_HOST` | `127.0.0.1` | Interface to listen on. Any other address puts the agent on your network |
+| `JARVIS_ALLOWED_HOSTS` | none | Extra hostnames the bridge answers to; a request for any other name gets a 403 |
+| `JARVIS_MODEL` | `claude-opus-5` | Model to run |
+| `JARVIS_EFFORT` | `medium` | Reasoning effort |
+| `JARVIS_ALLOW_WRITES` | off | `1` allows effectful tools (see below) |
+| `JARVIS_MCP_SERVERS` | all configured | Comma-separated `~/.claude.json` servers to pass on; empty passes none |
+| `JARVIS_ACCOUNT_CONNECTORS` | off | `1` lets your claude.ai account's connectors join the session |
+| `JARVIS_DISABLE` | none | Comma-separated capabilities to leave out: `browser`, `camera`, `interface` |
+| `JARVIS_ALLOWED_ORIGINS` | local dev | Extra WebSocket origins to accept |
+| `JARVIS_ALLOW_NO_ORIGIN` | off | Accept connections with no `Origin` header |
+| `JARVIS_WORKSPACE` | `~/.jarvis/workspace` | The agent's working directory; file tools are confined to it and the temp directory |
+| `JARVIS_FILE_ROOTS` | none | Extra folders the file tools and the `/file` endpoint may use |
+| `JARVIS_KEEP_TRANSCRIPTS` | off | `1` keeps the SDK's session transcripts in `~/.claude/projects` |
+| `JARVIS_CLAUDE_EXECUTABLE` | bundled CLI | Run the agent through this executable instead, e.g. a sandbox wrapper that execs the real CLI |
+| `JARVIS_CHROME_PIPE` | none | WSL only: the Windows pipe name the browser relay connects to |
+| `JARVIS_DEBUG` | off | `1` logs every agent message to the bridge terminal, answer text and tool calls included |
+| `JARVIS_VOICE_ID` | none | ElevenLabs voice id |
+| `ELEVENLABS_API_KEY` | none | Optional; enables the ElevenLabs voice + Scribe |
 
-A ferramenta `garcia.research` é executada nativamente pelo Cloudflare Worker em TypeScript. Pesquisa textual e Estúdio Visual usam Workers AI e DuckDuckGo; relatórios, imagens e versões ficam no R2, sessões e metadados no D1 e cache de prompts no KV. O GitHub é usado somente para o código-fonte. Não há GitHub Actions para executar pesquisas nem publicação de artefatos no repositório.
+### Frontend (`.env.local`)
 
-O Estúdio Visual mantém sessões iterativas: a Garcia reaproveita o `session_id`, refina o prompt com o feedback e salva cada versão no R2. O cliente Android exibe as imagens diretamente no histórico da conversa.
+| Variable | Effect |
+|---|---|
+| `VITE_BACKEND` | `bridge` (default) or `direct` |
+| `VITE_BRIDGE_URL` | Where to reach the bridge |
+| `VITE_TTS_ENGINE` | `system` or `kokoro` |
+| `VITE_KOKORO_VOICE` | Voice for the Kokoro engine |
+| `VITE_USE_ELEVENLABS` | Force the ElevenLabs voice on |
+| `VITE_ANTHROPIC_API_KEY` | Direct mode only |
 
-O pacote `garcia_research/` permanece como ferramenta Python local e opcional para testes/desenvolvimento; não é executado pelo Worker e não publica artefatos. Consulte [docs/RESEARCH_WORKER_GUIDE.md](docs/RESEARCH_WORKER_GUIDE.md) para configurar R2, D1, KV, modelos e executar `wrangler dev`. Consulte [docs/GARCIA_RESEARCH.md](docs/GARCIA_RESEARCH.md) para o pacote local.
+### Adding an ElevenLabs key
+
+You do not have to touch a flag. Either:
+
+- Set `ELEVENLABS_API_KEY` on the bridge before starting it, **or**
+- Add the key to your `elevenlabs` MCP server's env in `~/.claude.json` — the
+  bridge reads it from there too.
+
+Either way, `/health` starts reporting the capability, the browser picks it up on
+the next boot, and both the voice and transcription upgrade automatically.
+
+---
+
+## Enabling actions
+
+The tool gate starts **read-only**. Search, generation and lookups run freely;
+anything effectful — send, tap, delete, install, pay — is denied. Voice is a poor
+interface for a confirmation dialog, so the decision is made ahead of time, in
+`decideTool()` in `bridge/policy.mjs`. The bridge sets
+`settingSources: []`, which makes its own gate the only authority — filesystem
+settings and any global `bypassPermissions` cannot override it.
+
+A `PreToolUse` hook applies that policy to every call, including the reads the
+Claude Code CLI would otherwise approve by itself. In read-only mode the agent
+has no shell, and its file tools reach only its workspace (`~/.jarvis/workspace`),
+the temp directory and any folders in `JARVIS_FILE_ROOTS`. Paths that hold
+credentials, such as `~/.ssh`, `~/.claude` and `.env` files, stay refused even
+inside those folders.
+
+To allow effectful tools (phone, browser driving, sending), run the bridge this
+way instead:
+
+```bash
+npm run bridge:writes
+```
+
+The script passes `--writes` to the bridge, so it works in Windows `cmd` and
+PowerShell too. With `npm start`, use `npm start -- --writes`. Writes add `Bash`,
+`Write`, `Edit` and `NotebookEdit` to the agent's tools. The file tools stay
+inside the same folders; the shell can reach anything your user account can.
+
+> Read `decideTool()` before you do. *"Hey Jarvis, clean up my downloads folder"*
+> means something rather different with writes enabled.
+
+---
+
+## Troubleshooting
+
+**I can't hear him, or he can't hear me.** Press **D** for the diagnostics panel
+— it states plainly whether he is hearing you and whether he is producing sound.
+Press **T** for a one-line audio self-test.
+
+**No voice at all.** You must be in **Chrome or Edge**, in a **real browser
+window** (not an embedded preview), and you must have **allowed the microphone**.
+
+**Bridge not reachable.** Check that `npm run bridge` is still running in its
+terminal, and that nothing else is holding port `8787`. If the port is taken,
+the bridge says so in one line at startup and exits. It listens on `127.0.0.1`
+only. Reaching it from another machine takes `JARVIS_BRIDGE_HOST` and
+`JARVIS_ALLOWED_HOSTS`, and your own authentication in front of it first.
+
+**Browser control on Windows.** The bridge finds the Claude extension's named
+pipe, `\\.\pipe\claude-mcp-browser-bridge-<user>`, by itself. If the boot log
+says the extension is not running, open Chrome with the extension signed in.
+Each browser request looks for the pipe again, so the bridge does not need a
+restart.
+
+**Running the bridge in WSL, with Chrome on Windows.** Browser control works:
+the Windows native host exposes a named pipe rather than a Unix socket, and the
+bridge reaches it through a short PowerShell relay (WSL interop must be on,
+which it is by default). Open the app at `http://127.0.0.1:5173` if
+`localhost` is slow to load — Windows tries IPv6 loopback first, and WSL does
+not forward it.
+
+---
+
+## Tests
+
+`npm test` runs the bridge's tests with Node's built-in runner. They cover the
+network binding, the tool policy, the MCP server allowlist and the WSL browser
+relay, which runs only under WSL. The network and allowlist tests start the
+bridge on a random loopback port, and none of the tests opens an agent session.
+
+---
+
+## Security
+
+The bridge's defences live in `bridge/server.mjs` and `bridge/policy.mjs`:
+
+- It listens on `127.0.0.1` and answers only requests addressed to `localhost`,
+  `127.0.0.1` or `[::1]`, which blocks DNS rebinding.
+- The WebSocket accepts only local dev origins (add more with
+  `JARVIS_ALLOWED_ORIGINS`).
+- `/file`, `/img` and `/media` validate the scheme, confine to allowed roots,
+  resolve the real path, and refuse private and loopback addresses (SSRF guard).
+- The tool gate (`decideTool`) is default-deny for effectful MCP tools.
+- A `PreToolUse` hook enforces the tool policy on every call. File tools stay
+  inside the workspace, the temp directory and `JARVIS_FILE_ROOTS`, and
+  `WebFetch` cannot reach loopback, LAN or cloud metadata addresses.
+- claude.ai account connectors stay out of the session unless
+  `JARVIS_ACCOUNT_CONNECTORS=1`, and `JARVIS_MCP_SERVERS` narrows which
+  `~/.claude.json` servers the agent gets.
+- Session transcripts are written to `~/.claude/projects` only when
+  `JARVIS_KEEP_TRANSCRIPTS=1`.
+- `JARVIS_DISABLE` removes browser control, the camera or the interface tools
+  entirely, and `JARVIS_CLAUDE_EXECUTABLE` can run the agent inside a sandbox
+  wrapper.
+- A strict CSP in `index.html`; model-authored panel HTML is sanitised.
+
+---
+
+## Credits & licence
+
+MIT.
+
+The boot sound and any tracks in `public/audio/` ship with the project for the
+demo. If you go on to monetise something built on this, clearing the rights to
+that audio is your responsibility.
